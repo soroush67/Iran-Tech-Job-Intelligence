@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>{{ subject }}</title>
+</head>
+<body style="margin:0;padding:0;background:#f3f4f6;font-family:Vazirmatn,Tahoma,'Segoe UI',Arial,sans-serif;direction:rtl;text-align:right;color:#111827;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;">
+<tr><td align="center" style="padding:16px 8px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background:#ffffff;border-radius:12px;overflow:hidden;">
+<tr><td style="background:#0f172a;color:#ffffff;padding:16px 20px;font-size:16px;font-weight:bold;">
+Iran Tech Job Intelligence
+</td></tr>
+<tr><td style="padding:20px;font-size:14px;line-height:1.9;">
+{% block body %}{% endblock %}
+</td></tr>
+<tr><td style="padding:14px 20px;background:#f9fafb;color:#6b7280;font-size:12px;line-height:1.8;">
+{% block footer %}
+این پیام بر اساس هشدارهایی که خودتان تعریف کرده‌اید ارسال شده است.
+{% if unsubscribe_url %}<br><a href="{{ unsubscribe_url }}" style="color:#6b7280;">لغو این هشدار</a>{% endif %}
+{% if settings_url %} · <a href="{{ settings_url }}" style="color:#6b7280;">تنظیمات اعلان</a>{% endif %}
+{% endblock %}
+</td></tr>
+</table>
+</td></tr>
+</table>
+</body>
+</html>

@@ -1,0 +1,7 @@
+{% extends "_base.html" %}
+{% block body %}
+<p>برای فعال‌سازی ارسال اعلان به این نشانی، روی دکمه زیر بزنید. این لینک تا {{ hours }} ساعت معتبر است.</p>
+<p><a href="{{ verify_url }}" style="display:inline-block;background:#16a34a;color:#ffffff;text-decoration:none;padding:10px 18px;border-radius:8px;">تأیید نشانی ایمیل</a></p>
+<p style="color:#6b7280;font-size:12px;">اگر این درخواست را شما نداده‌اید، این ایمیل را نادیده بگیرید.</p>
+{% endblock %}
+{% block footer %}این پیام به دلیل ثبت این نشانی در Iran Tech Job Intelligence ارسال شده است.{% endblock %}

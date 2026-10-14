@@ -1,0 +1,4 @@
+-r requirements.txt
+pytest==8.3.5
+respx==0.22.0
+aiosmtpd==1.4.6

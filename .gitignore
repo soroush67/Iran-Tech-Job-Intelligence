@@ -1,0 +1,14 @@
+.env
+*.pyc
+__pycache__/
+.pytest_cache/
+.venv/
+node_modules/
+.next/
+out/
+backups/*
+!backups/.gitkeep
+nginx/certs/*
+!nginx/certs/.gitkeep
+*.log
+.DS_Store

@@ -1,0 +1,206 @@
+# Iran Tech Job Intelligence - production stack.
+#   cp .env.example .env   # fill the secrets
+#   docker compose up -d --build
+# Optional local LLM:  docker compose --profile ollama up -d
+# Tests:               docker compose --profile test run --rm test
+name: jobintel
+
+# Built once by `backend`; worker/scheduler/telegram-bot/certs reuse the image
+# (several services building one tag in parallel race each other).
+x-backend: &backend
+  image: jobintel-backend:latest
+  pull_policy: never
+  env_file: .env
+  environment:
+    DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-jobintel}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-jobintel}
+    REDIS_URL: redis://redis:6379/0
+  restart: unless-stopped
+  depends_on:
+    postgres: { condition: service_healthy }
+    redis: { condition: service_healthy }
+  logging: &logging
+    driver: json-file
+    options: { max-size: "10m", max-file: "5" }
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-jobintel}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-jobintel}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./backups:/backups
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [internal]
+    restart: unless-stopped
+    logging: *logging
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes", "--save", "300 10"]
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [internal]
+    restart: unless-stopped
+    logging: *logging
+
+  backend:
+    <<: *backend
+    build:
+      context: ./backend
+      target: runtime
+    pull_policy: build
+    command: ["api"]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/api/v1/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+    networks: [internal, egress]
+
+  worker:
+    <<: *backend
+    command: ["worker"]
+    depends_on:
+      backend: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import os,redis,sys; r=redis.Redis.from_url(os.environ['REDIS_URL']); sys.exit(0 if r.ping() and any(k.startswith(b'rq:worker:') for k in r.smembers('rq:workers')) else 1)\""]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks: [internal, egress]
+
+  scheduler:
+    <<: *backend
+    command: ["scheduler"]
+    depends_on:
+      backend: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import os,redis,sys,time; v=redis.Redis.from_url(os.environ['REDIS_URL']).get('heartbeat:scheduler'); sys.exit(0 if v and time.time()-int(v)<180 else 1)\""]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    networks: [internal]
+
+  telegram-bot:
+    <<: *backend
+    command: ["bot"]
+    depends_on:
+      backend: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "grep -qs app.bot.main /proc/[0-9]*/cmdline"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks: [internal, egress]
+
+  frontend:
+    build:
+      context: ./frontend
+    image: jobintel-frontend:latest
+    environment:
+      NODE_ENV: production
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/login"]
+      interval: 20s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks: [internal]
+    restart: unless-stopped
+    logging: *logging
+
+  certs:
+    # One-shot: creates a self-signed certificate in the certs volume if none is there.
+    # Replace nginx/certs/{fullchain,privkey}.pem with real ones (see README).
+    image: jobintel-backend:latest
+    pull_policy: never
+    command: ["certs"]
+    env_file: .env
+    user: "0:0"
+    volumes:
+      - certs:/certs
+      - ./nginx/certs:/custom-certs:ro
+    networks: [internal]
+    restart: "no"
+
+  nginx:
+    image: nginx:1.27-alpine
+    depends_on:
+      certs: { condition: service_completed_successfully }
+      backend: { condition: service_healthy }
+      frontend: { condition: service_healthy }
+    ports:
+      - "${HTTPS_PORT:-8443}:443"
+      - "${HTTP_PORT:-8088}:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/templates:/etc/nginx/templates:ro
+      - certs:/etc/nginx/certs:ro
+    environment:
+      HTTPS_PORT: ${HTTPS_PORT:-8443}
+      NGINX_ENVSUBST_FILTER: "^HTTPS_PORT$"
+      NGINX_ENVSUBST_OUTPUT_DIR: /etc/nginx/jobintel.d
+    tmpfs:
+      - /etc/nginx/jobintel.d
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "--no-check-certificate", "https://127.0.0.1/api/v1/health"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+    networks: [internal, egress]
+    restart: unless-stopped
+    logging: *logging
+
+  # Backend test suite against the stack's Postgres (separate database jobintel_test)
+  # and Redis (db 15). Never touches the application data:
+  #   docker compose --profile test run --rm test
+  test:
+    build:
+      context: ./backend
+      target: test
+    image: jobintel-backend-test:latest
+    profiles: ["test"]
+    # no env_file: tests use their own fixed values (conftest.py), never real secrets
+    environment:
+      ENV: test
+      TEST_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-jobintel}:${POSTGRES_PASSWORD}@postgres:5432/jobintel_test
+      TEST_REDIS_URL: redis://redis:6379/15
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    networks: [internal]
+
+  ollama:
+    image: ollama/ollama:0.6.8
+    profiles: ["ollama"]
+    volumes:
+      - ollama:/root/.ollama
+    networks: [internal, egress]
+    restart: unless-stopped
+
+networks:
+  # No route to the outside: the database and Redis live only here.
+  internal:
+    internal: true
+  # Services that must reach the job sites, Anthropic, SMTP or Telegram.
+  egress: {}
+
+volumes:
+  pgdata:
+  redisdata:
+  certs:
+  ollama:

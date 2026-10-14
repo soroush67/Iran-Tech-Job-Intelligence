@@ -1,0 +1,16 @@
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e5e7eb;border-radius:10px;margin:0 0 14px 0;">
+<tr><td style="padding:14px 16px;">
+<div style="font-size:12px;color:#2563eb;font-weight:bold;">{{ item.event_label }}</div>
+<div style="font-size:16px;font-weight:bold;margin:4px 0;"><bdi>{{ item.title }}</bdi></div>
+<div style="color:#374151;"><bdi>{{ item.company or 'شرکت نامشخص' }}</bdi>{% if item.location %} · {{ item.location }}{% endif %}</div>
+<div style="margin-top:6px;color:#374151;">دسته: <bdi>{{ item.categories }}</bdi></div>
+<div style="color:#374151;">حقوق ({{ item.salary_label }}): <bdi>{{ item.salary_text }}</bdi></div>
+{% if item.match_score is not none %}<div style="color:#374151;">تطابق با پروفایل شما: {{ item.match_score }}٪</div>{% endif %}
+{% if item.summary %}<div style="margin-top:8px;color:#4b5563;font-size:13px;"><bdi>{{ item.summary }}</bdi></div>{% endif %}
+{% if item.changes %}<ul style="margin:8px 0 0 0;padding-right:18px;color:#4b5563;font-size:13px;">{% for c in item.changes %}<li><bdi>{{ c }}</bdi></li>{% endfor %}</ul>{% endif %}
+<div style="margin-top:12px;">
+<a href="{{ item.source_url }}" style="display:inline-block;background:#2563eb;color:#ffffff;text-decoration:none;padding:8px 14px;border-radius:8px;margin:0 0 6px 6px;">مشاهده آگهی اصلی</a>
+<a href="{{ item.dashboard_url }}" style="display:inline-block;background:#e5e7eb;color:#111827;text-decoration:none;padding:8px 14px;border-radius:8px;margin:0 0 6px 6px;">تحلیل در داشبورد</a>
+</div>
+</td></tr>
+</table>

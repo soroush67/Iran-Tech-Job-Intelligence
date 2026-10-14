@@ -1,0 +1,16 @@
+# Development overrides:  docker compose -f compose.yaml -f compose.dev.yaml up -d --build
+# - exposes Postgres/Redis/backend on localhost for debugging
+# - live-reloads the API from the source tree
+services:
+  postgres:
+    ports: ["127.0.0.1:5433:5432"]
+    networks: [internal, egress]
+  redis:
+    ports: ["127.0.0.1:6380:6379"]
+    networks: [internal, egress]
+  backend:
+    command: ["sh", "-c", "alembic upgrade head && python -m app.bootstrap && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"]
+    volumes: ["./backend:/app"]
+    ports: ["127.0.0.1:8000:8000"]
+    environment:
+      ENV: development

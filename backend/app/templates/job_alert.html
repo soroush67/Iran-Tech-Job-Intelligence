@@ -1,0 +1,5 @@
+{% extends "_base.html" %}
+{% block body %}
+<p style="margin:0 0 14px 0;">{{ intro }}</p>
+{% for item in items %}{% include "_job_card.html" %}{% endfor %}
+{% endblock %}

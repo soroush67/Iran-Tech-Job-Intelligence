@@ -1,0 +1,6 @@
+{% extends "_base.html" %}
+{% block body %}
+<p style="margin:0 0 6px 0;font-weight:bold;">گزارش روزانه {{ date_label }}</p>
+<p style="margin:0 0 14px 0;color:#4b5563;">{{ items|length }} مورد جدید یا تغییرکرده مطابق هشدارهای شما{% if truncated %} (فقط {{ items|length }} مورد اول نمایش داده شده؛ همه را در داشبورد ببینید){% endif %}.</p>
+{% for item in items %}{% include "_job_card.html" %}{% endfor %}
+{% endblock %}
